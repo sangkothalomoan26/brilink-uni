@@ -12,23 +12,27 @@ interface State {
 
 // Fix: The 'public' access modifier, while valid TypeScript, is not idiomatic for React class components and was causing TypeScript to fail to recognize inherited properties like 'props' and 'setState'. Removing it from all class members resolves the type errors.
 class ErrorBoundary extends Component<Props, State> {
+  // FIX: Removed 'public' keyword.
   state: State = {
     hasError: false,
     error: null,
     errorInfo: null,
   };
 
+  // FIX: Removed 'public' keyword.
   static getDerivedStateFromError(error: Error): State {
     // Update state so the next render will show the fallback UI.
     return { hasError: true, error, errorInfo: null };
   }
 
+  // FIX: Removed 'public' keyword.
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // You can also log the error to an error reporting service
     console.error("Uncaught error:", error, errorInfo);
     this.setState({ error, errorInfo });
   }
 
+  // FIX: Removed 'public' keyword.
   render() {
     if (this.state.hasError) {
       // You can render any custom fallback UI
