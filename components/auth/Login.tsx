@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Store } from 'lucide-react';
+import { Store, AlertTriangle } from 'lucide-react';
 
 export const Login: React.FC = () => {
     const [isRegistering, setIsRegistering] = useState(false);
@@ -13,11 +13,21 @@ export const Login: React.FC = () => {
 
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
     const { login, signUp } = useAuth();
+
+    useEffect(() => {
+        const sessionExpired = sessionStorage.getItem('sessionExpired');
+        if (sessionExpired) {
+            setSessionExpiredMessage('Sesi Anda telah berakhir. Silakan login kembali.');
+            sessionStorage.removeItem('sessionExpired');
+        }
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSessionExpiredMessage(null);
         setLoading(true);
         try {
             if (isRegistering) {
@@ -37,7 +47,7 @@ export const Login: React.FC = () => {
                 errorMessage = 'Format email tidak valid.';
             } else if (err.code === 'auth/weak-password') {
                 errorMessage = 'Password terlalu lemah. Minimal 6 karakter.';
-            } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+            } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
                  errorMessage = 'Email/Username atau password salah.';
             }
             setError(errorMessage);
@@ -54,6 +64,7 @@ export const Login: React.FC = () => {
         setEmail('');
         setUsername('');
         setPassword('');
+        setSessionExpiredMessage(null);
     };
     
     return (
@@ -69,8 +80,21 @@ export const Login: React.FC = () => {
                             <p className="text-sm text-gray-500 dark:text-gray-400">Voucher Management</p>
                         </div>
                     </div>
-                    <h2 className="text-xl text-gray-800 dark:text-gray-200">{isRegistering ? 'Daftar Akun Baru' : 'Silakan Login'}</h2>
+                    <h2 className="text-lg text-gray-600 dark:text-gray-400 tracking-wide">{isRegistering ? 'Daftar Akun Baru' : 'Silakan Login'}</h2>
                 </div>
+
+                {sessionExpiredMessage && (
+                    <div className="bg-yellow-100 dark:bg-yellow-900/20 border-l-4 border-yellow-500 text-yellow-700 dark:text-yellow-200 p-4" role="alert">
+                        <div className="flex">
+                            <div className="py-1"><AlertTriangle className="h-5 w-5 text-yellow-500 mr-3" /></div>
+                            <div>
+                                <p className="font-bold">Sesi Berakhir</p>
+                                <p className="text-sm">{sessionExpiredMessage}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     <div className="rounded-md shadow-sm -space-y-px">
                         {isRegistering ? (
