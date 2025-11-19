@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Clipboard } from 'lucide-react';
@@ -15,6 +14,7 @@ import { ProviderView } from './components/provider/ProviderView';
 import { SalesView } from './components/sales/SalesView';
 import { Modal } from './components/common/Modal';
 import { Toast } from './components/common/Toast';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 import { generateCompleteReport, generateShortReport, generateCompleteReceiptHTML, generateShortReceiptHTML } from './utils/reportGenerator';
 import { calculateAutoSellPrice, formatCurrency, formatNumberWithSeparators, parseFormattedNumber } from './utils/helpers';
@@ -573,7 +573,11 @@ const App: React.FC = () => {
         );
     }
     
-    return user ? <AppContent /> : <Login />;
+    return user ? (
+        <ErrorBoundary>
+            <AppContent />
+        </ErrorBoundary>
+    ) : <Login />;
 };
 
 
