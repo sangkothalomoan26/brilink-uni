@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Clipboard } from 'lucide-react';
+import type { User } from 'firebase/auth';
 
 import { useAuth } from './hooks/useAuth';
 import { useFirestoreStore } from './hooks/useFirestoreStore';
@@ -28,8 +29,9 @@ const VOUCHER_FORM_DEFAULTS: Omit<Voucher, 'id' | 'providerId' | 'name'> = {
     plannedStock: 0,
 };
 
-const AppContent: React.FC = () => {
-    const { user, logout } = useAuth();
+// The AppContent component now receives the user and logout function as props.
+// This ensures it never renders unless a valid user object exists.
+const AppContent: React.FC<{ user: User; logout: () => Promise<void> }> = ({ user, logout }) => {
     const [theme, toggleTheme] = useTheme();
     const { 
         providers, 
@@ -43,7 +45,7 @@ const AppContent: React.FC = () => {
         updateVoucher,
         deleteVoucher,
         addLog 
-    } = useFirestoreStore(user!.uid);
+    } = useFirestoreStore(user.uid); // We can now safely use user.uid because it's guaranteed to exist.
     
     const [currentView, setCurrentView] = useState<'dashboard' | 'provider' | 'sales'>('dashboard');
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
@@ -563,7 +565,7 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-    const { user, loading } = useAuth();
+    const { user, loading, logout } = useAuth();
 
     if (loading) {
         return (
@@ -573,9 +575,11 @@ const App: React.FC = () => {
         );
     }
     
+    // The main App component now passes the user object down.
+    // This ensures AppContent only renders when 'user' is guaranteed to be a valid object.
     return user ? (
         <ErrorBoundary>
-            <AppContent />
+            <AppContent user={user} logout={logout} />
         </ErrorBoundary>
     ) : <Login />;
 };
