@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Clipboard } from 'lucide-react';
+import { Clipboard, AlertTriangle } from 'lucide-react';
 import type { User } from 'firebase/auth';
 
 import { useAuth } from './hooks/useAuth';
 import { useFirestoreStore } from './hooks/useFirestoreStore';
 import { useTheme } from './hooks/useTheme';
+import useIdleTimer from './hooks/useIdleTimer';
 
 import { Login } from './components/auth/Login';
 import { Header } from './components/layout/Header';
@@ -54,21 +55,20 @@ const AppContent: React.FC<{ user: User; logout: () => Promise<void> }> = ({ use
     const [isVoucherFormOpen, setIsVoucherFormOpen] = useState(false);
     const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
     const [voucherFormData, setVoucherFormData] = useState<Partial<Voucher>>({});
-
     const [isAddProviderModalOpen, setIsAddProviderModalOpen] = useState(false);
-    
     const [deletingVoucher, setDeletingVoucher] = useState<Voucher | null>(null);
     const [deletingProvider, setDeletingProvider] = useState<Provider | null>(null);
-
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportContent, setReportContent] = useState('');
     const [reportTitle, setReportTitle] = useState('');
-    
     const [stockToAdd, setStockToAdd] = useState<{voucher: Voucher | null, quantity: string}>({ voucher: null, quantity: ''});
-
     const [isPrintChoiceModalOpen, setIsPrintChoiceModalOpen] = useState(false);
-    
     const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+
+    // Auto-logout state
+    const [isIdleWarningOpen, setIsIdleWarningOpen] = useState(false);
+    const [countdown, setCountdown] = useState(60);
+    const countdownIntervalRef = useRef<number | null>(null);
 
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
     
@@ -91,6 +91,51 @@ const AppContent: React.FC<{ user: User; logout: () => Promise<void> }> = ({ use
         return suggestions;
     }, []);
     const [voucherNameSuggestions, setVoucherNameSuggestions] = useState<string[]>([]);
+
+    const handleLogout = useCallback(async (sessionExpired = false) => {
+        if (sessionExpired) {
+            sessionStorage.setItem('sessionExpired', 'true');
+        }
+        await logout();
+    }, [logout]);
+    
+    // Countdown logic
+    useEffect(() => {
+        if (isIdleWarningOpen) {
+            countdownIntervalRef.current = window.setInterval(() => {
+                setCountdown(prev => {
+                    if (prev <= 1) {
+                        clearInterval(countdownIntervalRef.current!);
+                        handleLogout(true);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else {
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        }
+
+        return () => {
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, [isIdleWarningOpen, handleLogout]);
+
+    const handleIdle = () => {
+        setIsIdleWarningOpen(true);
+    };
+
+    const { resetTimer } = useIdleTimer(handleIdle, 15 * 60 * 1000); // 15 minutes
+
+    const stayLoggedIn = () => {
+        setIsIdleWarningOpen(false);
+        setCountdown(60);
+        resetTimer();
+    };
 
 
     const addToast = useCallback((type: ToastMessage['type'], message: string) => {
@@ -430,7 +475,7 @@ const AppContent: React.FC<{ user: User; logout: () => Promise<void> }> = ({ use
 
     return (
         <div className="min-h-screen flex flex-col bg-light-bg dark:bg-dark-bg text-gray-800 dark:text-gray-200 transition-colors duration-300">
-            <Header theme={theme} toggleTheme={toggleTheme} onGenerateReport={handleGenerateReport} onPrintReceipt={handlePrintReceipt} onShowHistory={() => setIsActivityLogOpen(true)} onLogout={logout} isLoggedIn={!!user}/>
+            <Header theme={theme} toggleTheme={toggleTheme} onGenerateReport={handleGenerateReport} onPrintReceipt={handlePrintReceipt} onShowHistory={() => setIsActivityLogOpen(true)} onLogout={() => handleLogout()} isLoggedIn={!!user}/>
             <main className="flex-grow container mx-auto p-4 md:p-8">
                 {renderContent()}
             </main>
@@ -439,6 +484,18 @@ const AppContent: React.FC<{ user: User; logout: () => Promise<void> }> = ({ use
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
 
             {/* Modals Here... */}
+             <Modal isOpen={isIdleWarningOpen} onClose={stayLoggedIn} title="Sesi Akan Berakhir">
+                <div className="text-center space-y-4">
+                    <AlertTriangle size={48} className="mx-auto text-yellow-500" />
+                    <p>Anda tidak aktif. Sesi akan berakhir dalam hitungan:</p>
+                    <p className="text-4xl font-bold">{countdown}</p>
+                    <p className="text-sm">Klik tombol di bawah untuk tetap login.</p>
+                    <button onClick={stayLoggedIn} className="w-full px-6 py-3 bg-gold-500 text-navy-900 font-bold rounded-lg shadow-lg hover:shadow-soft-glow transition-all">
+                        Tetap Login
+                    </button>
+                </div>
+            </Modal>
+            
             <Modal isOpen={isVoucherFormOpen} onClose={() => { setIsVoucherFormOpen(false); setVoucherNameSuggestions([]); }} title={editingVoucher ? 'Edit Voucher' : 'Tambah Voucher Baru'}>
                 <form onSubmit={handleVoucherFormSubmit} className="space-y-4">
                     <input type="hidden" name="providerId" value={voucherFormData.providerId} />
